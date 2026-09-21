@@ -1,0 +1,22 @@
+cask "malina" do
+  version "@@VERSION@@"
+  sha256 "@@SHA256@@"
+
+  url "https://github.com/meltingcore/malina/releases/download/v#{version}/malina-#{version}-macos-universal.zip",
+      verified: "github.com/meltingcore/malina/"
+  name "Malina"
+  desc "Back up and restore Raspberry Pi systems over SSH"
+  homepage "https://malina.meltingcore.dev"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on macos: ">= :monterey"
+
+  app "malina-#{version}-macos-universal/Malina.app"
+  binary "malina-#{version}-macos-universal/malina-cli", target: "malina"
+
+  zap trash: "~/Library/Application Support/Malina"
+end

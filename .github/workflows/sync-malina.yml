@@ -1,0 +1,95 @@
+name: Sync Malina cask
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 */6 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-malina-cask
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Update from latest stable release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out tap
+        uses: actions/checkout@v7
+
+      - name: Resolve latest stable release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_json="${RUNNER_TEMP}/malina-release.json"
+          if ! gh api repos/meltingcore/malina/releases/latest > "${release_json}" 2>/dev/null; then
+            echo "::notice::Malina does not have a stable GitHub release yet."
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          tag="$(jq -r '.tag_name' "${release_json}")"
+          version="${tag#v}"
+          if [[ "${tag}" != "v${version}" || ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Latest stable release tag '${tag}' is not vMAJOR.MINOR.PATCH."
+            exit 1
+          fi
+
+          archive="malina-${version}-macos-universal.zip"
+          asset_count="$(jq --arg name "${archive}" '[.assets[] | select(.name == $name)] | length' "${release_json}")"
+          if [[ "${asset_count}" != "1" ]]; then
+            echo "::notice::Stable release ${tag} does not contain ${archive}; leaving the tap unchanged."
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "available=true" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "archive=${archive}" >> "${GITHUB_OUTPUT}"
+
+      - name: Download macOS release archive
+        if: steps.release.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
+        run: |
+          mkdir -p dist
+          gh release download "${RELEASE_TAG}" \
+            --repo meltingcore/malina \
+            --pattern "${RELEASE_ARCHIVE}" \
+            --dir dist
+
+      - name: Render cask
+        if: steps.release.outputs.available == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
+        run: ./scripts/update-malina-cask.sh "${RELEASE_VERSION}" "dist/${RELEASE_ARCHIVE}"
+
+      - name: Commit cask update
+        if: steps.release.outputs.available == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Casks/malina.rb; then
+            echo "Cask is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/malina.rb
+          git commit -m "Update Malina to ${RELEASE_VERSION}"
+          git push
