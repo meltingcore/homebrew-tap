@@ -3,7 +3,6 @@ cask "malina" do
   sha256 "b688c83cc71cb1838f98d211f2702a5f5ffbdd3f755ab6439af529a4f5cbadcb"
 
   url "https://github.com/meltingcore/malina/releases/download/v#{version}/malina-#{version}-macos-universal.zip",
-      verified: "github.com/meltingcore/malina/"
   name "Malina"
   desc "Back up and restore Raspberry Pi systems over SSH"
   homepage "https://malina.meltingcore.dev/"
