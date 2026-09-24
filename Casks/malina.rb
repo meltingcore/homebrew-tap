@@ -1,6 +1,6 @@
 cask "malina" do
-  version "0.1.2"
-  sha256 "36f7781c45ce98a72c7da15de53ccf1e73cc5a5b782540f37947a61dd7c876df"
+  version "0.1.3"
+  sha256 "68d3717d5297c643cb49868706904dd197fd9599912cb5e68a961cf119c066be"
 
   url "https://github.com/meltingcore/malina/releases/download/v#{version}/malina-#{version}-macos-universal.zip"
   name "Malina"
